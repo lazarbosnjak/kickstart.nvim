@@ -102,7 +102,7 @@ vim.g.have_nerd_font = false
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.o.relativenumber = true
+vim.o.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.o.mouse = 'a'
@@ -670,6 +670,16 @@ require('lazy').setup({
       --  - capabilities (table): Override fields in capabilities. Can be used to disable certain LSP features.
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
+      local function log(msg)
+        local log_file = vim.fn.expand '~/.cache/nvim/debug.log'
+        local f = io.open(log_file, 'a')
+        if f then
+          f:write(msg .. '\n')
+          f:close()
+        end
+      end
+
+      log 'Neovim config loaded'
       local servers = {
         -- clangd = {},
         -- gopls = {},
@@ -683,7 +693,11 @@ require('lazy').setup({
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         -- ts_ls = {},
         --
-
+        --
+        cssls = {},
+        jsonls = {},
+        eslint = {},
+        tailwindcss = {},
         lua_ls = {
           -- cmd = { ... },
           -- filetypes = { ... },
@@ -716,6 +730,7 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'html',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -723,6 +738,28 @@ require('lazy').setup({
         ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
         automatic_installation = false,
         handlers = {
+          html = function()
+            log '[html] custom handler invoked'
+
+            require('lspconfig').html.setup {
+              filetypes = { 'html', 'templ' },
+              root_dir = function(fname)
+                log('[html] root_dir called for: ' .. tostring(fname))
+                local root = require('lspconfig.util').root_pattern('package.json', '.git', 'index.html')(fname) or vim.loop.cwd()
+                log('[html] root_dir resolved to: ' .. tostring(root))
+                return root
+              end,
+              init_options = {
+                configurationSection = { 'html', 'css', 'javascript' },
+                embeddedLanguages = {
+                  css = true,
+                  javascript = true,
+                },
+                provideFormatter = true,
+              },
+            }
+          end,
+
           function(server_name)
             local server = servers[server_name] or {}
             -- This handles overriding only values explicitly passed
@@ -768,6 +805,17 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        javascript = { 'prettier' },
+        typescript = { 'prettier' },
+        javascriptreact = { 'prettier' },
+        typescriptreact = { 'prettier' },
+        html = { 'prettier' },
+        css = { 'prettier' },
+        scss = { 'prettier' },
+        json = { 'prettier' },
+        yaml = { 'prettier' },
+        markdown = { 'prettier' },
+        graphql = { 'prettier' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -973,18 +1021,18 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
@@ -1012,5 +1060,14 @@ require('lazy').setup({
   },
 })
 
+-- Custom tab spaces
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'html', 'css', 'javascript', 'typescript', 'json' },
+  callback = function()
+    vim.opt_local.tabstop = 2
+    vim.opt_local.shiftwidth = 2
+    vim.opt_local.expandtab = true
+  end,
+})
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
